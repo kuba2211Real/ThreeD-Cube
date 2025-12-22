@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ThreeD Cube</title>
+
+<style>
+  :root {
+    --size: 180px;
+    --half: calc(var(--size) / 2);
+    --accent: #00ffff;
+  }
+
+  /* Prevent text selection everywhere */
+  * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+    color: #eee;
+    background: radial-gradient(circle at top, #222, #000 65%);
+    transition: background 0.6s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* UI container */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    padding: 18px 22px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+  }
+
+  button, select {
+    background: #1b1b1b;
+    color: #f2f2f2;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    transition: background 0.3s ease;
+  }
+
+  button:hover, select:hover {
+    background: #2a2a2a;
+  }
+
+  select option {
+    background: #111;
+    color: #fff;
+  }
+
+  #uploadInput {
+    display: none;
+  }
+
+  /* Slider container */
+  .slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #eee;
+    font-weight: 600;
+    font-family: system-ui, sans-serif;
+    font-size: 15px;
+  }
+
+  /* Slider styles */
+  input[type=range] {
+    width: 170px;
+    height: 8px;
+    -webkit-appearance: none;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #888, #444);
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  input[type=range]:hover {
+    background: linear-gradient(90deg, #aaa, #666);
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  input[type=range]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  .value {
+    width: 48px;
+    text-align: center;
+    font-family: monospace;
+    font-size: 14px;
+  }
+
+  /* Scene */
+  .scene {
+    width: calc(var(--size) * 3);
+    height: calc(var(--size) * 3);
+    perspective: 1200px;
+    position: relative;
+  }
+
+  /* Cube container */
+  .cube-wrap {
+    width: var(--size);
+    height: var(--size);
+    margin: auto;
+    transform-style: preserve-3d;
+    transform: translateY(40px) rotateX(40deg) rotateY(0deg);
+    cursor: grab;
+    transition: cursor 0.2s ease;
+  }
+
+  .cube-wrap:active {
+    cursor: grabbing;
+  }
+
+  /* Cube */
+  .cube {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+
+  /* Faces */
+  .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background-size: cover;
+    background-position: center;
+    transition: box-shadow 0.3s ease, outline 0.3s ease;
+  }
+
+  /* Active face highlight */
+  .face.active {
+    outline: 3px solid var(--accent);
+    box-shadow: 0 0 30px var(--accent);
+  }
+
+  /* Materials */
+  .metal {
+    background: linear-gradient(135deg, #eee, #999, #eee);
+    box-shadow:
+      inset 0 0 40px rgba(0, 0, 0, 0.35),
+      0 20px 45px rgba(0, 0, 0, 0.5);
+  }
+
+  .glass {
+    background: linear-gradient(135deg, rgba(255,255,255,0.35), rgba(255,255,255,0.05));
+    box-shadow:
+      inset 0 0 35px rgba(255,255,255,0.2),
+      0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .neon {
+    background:
+      radial-gradient(circle at top, #7fffff, #00ffff 35%, #003333 70%);
+    box-shadow:
+      0 0 20px #00ffff,
+      0 0 40px rgba(0, 255, 255, 0.8),
+      0 0 80px rgba(0, 255, 255, 0.6),
+      inset 0 0 20px rgba(0, 0, 0, 0.4);
+    animation: neonPulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes neonPulse {
+    0%, 100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.35);
+    }
+  }
+
+  .carbon {
+    background: repeating-linear-gradient(45deg, #111 0 6px, #1a1a1a 6px 12px);
+    box-shadow:
+      inset 0 0 40px rgba(0,0,0,0.6),
+      0 20px 45px rgba(0,0,0,0.5);
+  }
+
+  /* Face transforms */
+  .front { transform: translateZ(var(--half)); }
+  .back { transform: rotateY(180deg) translateZ(var(--half)); }
+  .right { transform: rotateY(90deg) translateZ(var(--half)); }
+  .left { transform: rotateY(-90deg) translateZ(var(--half)); }
+  .top { transform: rotateX(90deg) translateZ(var(--half)); }
+  .bottom { transform: rotateX(-90deg) translateZ(var(--half)); }
+
+  /* FPS counter style */
+  #fpsCounter {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 16px;
+    color: #00ffff;
+    user-select: none;
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Watermark bottom right */
+  #watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.75);
+    user-select: none;
+    pointer-events: none;
+    z-index: 1000;
+  }
+</style>
+</head>
+
+<body>
+
+  <div class="controls" role="region" aria-label="3D cube controls">
+    <button id="uploadBtn" title="Upload texture">Texture</button>
+    <input id="uploadInput" type="file" accept="image/*" />
+
+    <select id="material" title="Select material">
+      <option value="metal">Metal</option>
+      <option value="glass">Glass</option>
+      <option value="neon">Neon</option>
+      <option value="carbon">Carbon</option>
+    </select>
+
+    <select id="targetFace" title="Select cube face for texture">
+      <option value="all">All faces</option>
+      <option value="front">Front</option>
+      <option value="back">Back</option>
+      <option value="right">Right</option>
+      <option value="left">Left</option>
+      <option value="top">Top</option>
+      <option value="bottom">Bottom</option>
+    </select>
+
+    <div class="slider" title="Cube rotation speed">
+      <label for="speed" style="user-select:none;">ThreeD Cube ⚡ Speed:</label>
+      <input type="range" id="speed" min="-10" max="10" step="0.1" value="1" />
+      <div class="value" id="speedVal">1.0</div>
+    </div>
+
+    <select id="quality" title="Select graphics quality">
+      <option value="low">Low</option>
+      <option value="medium" selected>Medium</option>
+      <option value="ultra">Ultra</option>
+    </select>
+  </div>
+
+  <div class="scene" aria-label="3D cube scene">
+    <div class="cube-wrap" id="cubeWrap" role="img" aria-label="Rotating 3D cube">
+      <div class="cube">
+        <div class="face front metal"></div>
+        <div class="face back metal"></div>
+        <div class="face right metal"></div>
+        <div class="face left metal"></div>
+        <div class="face top metal"></div>
+        <div class="face bottom metal"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="fpsCounter" aria-live="polite" aria-atomic="true">FPS: 0</div>
+  <div id="watermark">By kuba2211Real</div>
+
+<script>
+  const body = document.body;
+  const cubeWrap = document.getElementById("cubeWrap");
+  const faces = document.querySelectorAll(".face");
+
+  const speedSlider = document.getElementById("speed");
+  const speedVal = document.getElementById("speedVal");
+  const materialSelect = document.getElementById("material");
+  const targetFaceSelect = document.getElementById("targetFace");
+  const uploadInput = document.getElementById("uploadInput");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const qualitySelect = document.getElementById("quality");
+
+  let rotX = 40, rotY = 0;
+  let speed = parseFloat(speedSlider.value);
+  let dragging = false, startX, startY;
+  let lastTime = null;
+
+  // FPS counter variables
+  let fpsCounter = document.getElementById('fpsCounter');
+  let fpsLastTime = performance.now();
+  let fpsFrames = 0;
+  let fps = 0;
+
+  // Update speed display
+  speedSlider.oninput = e => {
+    speed = parseFloat(e.target.value);
+    speedVal.textContent = speed.toFixed(1);
+  };
+
+  // Change material and toggle neon background
+  materialSelect.onchange = () => {
+    const mat = materialSelect.value;
+    body.classList.toggle("neon-room", mat === "neon");
+
+    faces.forEach(f => {
+      const side = [...f.classList].find(c =>
+        ["front", "back", "left", "right", "top", "bottom"].includes(c)
+      );
+      f.className = `face ${side} ${mat}`;
+      // Clear background images on material change
+      f.style.backgroundImage = '';
+    });
+  };
+
+  // Highlight selected face(s)
+  function updateActiveFace() {
+    const target = targetFaceSelect.value;
+    faces.forEach(f => {
+      f.classList.toggle("active", target !== "all" && f.classList.contains(target));
+    });
+  }
+  targetFaceSelect.onchange = updateActiveFace;
+  updateActiveFace();
+
+  // Upload texture file
+  uploadBtn.onclick = () => uploadInput.click();
+  uploadInput.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const target = targetFaceSelect.value;
+      faces.forEach(f => {
+        if (target === "all" || f.classList.contains(target)) {
+          f.style.backgroundImage = `url(${ev.target.result})`;
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+    uploadInput.value = null; // Reset file input so same file can be uploaded again if needed
+  };
+
+  // Drag rotation
+  cubeWrap.onmousedown = e => {
+    if (e.button !== 0) return; // only left click
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    cubeWrap.style.cursor = 'grabbing';
+  };
+  window.onmouseup = e => {
+    if (e.button !== 0) return;
+    dragging = false;
+    cubeWrap.style.cursor = 'grab';
+  };
+  window.onmousemove = e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    rotY += dx * 0.5;
+    rotX -= dy * 0.5;
+    rotX = Math.min(90, Math.max(-90, rotX));
+
+    updateCubeTransform();
+  };
+
+  // Update cube rotation transform
+  function updateCubeTransform() {
+    cubeWrap.style.transform = `translateY(40px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  }
+
+  // Graphics quality effect
+  function applyQuality(quality) {
+    switch (quality) {
+      case 'low':
+        // Lower quality: disable box-shadow and animations to improve performance
+        faces.forEach(f => {
+          f.style.filter = 'none';
+          f.style.boxShadow = 'none';
+          f.style.transition = 'none';
+          f.style.animation = 'none';
+        });
+        break;
+      case 'medium':
+        // Medium quality: enable box-shadow and transition but no animation
+        faces.forEach(f => {
+          f.style.filter = '';
+          f.style.boxShadow = '';
+          f.style.transition = '';
+          f.style.animation = '';
+        });
+        break;
+      case 'ultra':
+        // Ultra quality: enable animations and shadows (neon pulse works)
+        faces.forEach(f => {
+          f.style.filter = '';
+          f.style.boxShadow = '';
+          f.style.transition = '';
+          if (f.classList.contains('neon')) {
+            f.style.animation = 'neonPulse 2.4s ease-in-out infinite';
+          }
+        });
+        break;
+    }
+  }
+  qualitySelect.onchange = () => {
+    applyQuality(qualitySelect.value);
+  };
+  applyQuality(qualitySelect.value);
+
+  // Animation loop with FPS counter
+  function animate(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const delta = timestamp - lastTime;
+    lastTime = timestamp;
+
+    if (!dragging) {
+      rotY += speed * (delta / 16);
+      rotY %= 360;
+      updateCubeTransform();
+    }
+
+    // FPS counter update
+    fpsFrames++;
+    const now = performance.now();
+    if (now - fpsLastTime >= 1000) {
+      fps = fpsFrames;
+      fpsFrames = 0;
+      fpsLastTime = now;
+      fpsCounter.textContent = `FPS: ${fps}`;
+    }
+
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  updateCubeTransform();
+</script>
+
+<div id="watermark">By kuba2211Real</div>
+
+</body>
+</html>
